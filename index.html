@@ -216,11 +216,23 @@
     <button class="clear-btn" onclick="clearChecked()">완료된 항목 모두 삭제</button>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    let items = JSON.parse(localStorage.getItem('shoppingList') || '[]');
+    const SUPABASE_URL = 'https://lhxjyehkttuunnskexge.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeGp5ZWhrdHR1dW5uc2tleGdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMTQ0OTEsImV4cCI6MjA5MDc5MDQ5MX0.VlQXG6DGP_WLZsXPz2sumoDqcczYt4C9g3MDDYosIrY';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function save() {
-      localStorage.setItem('shoppingList', JSON.stringify(items));
+    let items = [];
+
+    async function loadItems() {
+      const { data, error } = await supabase
+        .from('shopping_items')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (!error) {
+        items = data;
+        render();
+      }
     }
 
     function render() {
@@ -239,13 +251,13 @@
         summary.innerHTML = `총 <span>${items.length}</span>개 중 <span>${done}</span>개 완료`;
       }
 
-      items.forEach((item, idx) => {
+      items.forEach((item) => {
         const li = document.createElement('li');
         if (item.checked) li.classList.add('checked');
 
         const checkbox = document.createElement('div');
         checkbox.className = 'checkbox' + (item.checked ? ' checked' : '');
-        checkbox.onclick = () => toggleItem(idx);
+        checkbox.onclick = () => toggleItem(item.id, item.checked);
 
         const text = document.createElement('span');
         text.className = 'item-text';
@@ -255,7 +267,7 @@
         delBtn.className = 'delete-btn';
         delBtn.textContent = '✕';
         delBtn.title = '삭제';
-        delBtn.onclick = () => deleteItem(idx);
+        delBtn.onclick = () => deleteItem(item.id);
 
         li.appendChild(checkbox);
         li.appendChild(text);
@@ -264,40 +276,49 @@
       });
     }
 
-    function addItem() {
+    async function addItem() {
       const input = document.getElementById('itemInput');
       const name = input.value.trim();
       if (!name) return;
-      items.push({ name, checked: false });
-      save();
-      render();
-      input.value = '';
-      input.focus();
+      const { error } = await supabase
+        .from('shopping_items')
+        .insert({ name, checked: false });
+      if (!error) {
+        await loadItems();
+        input.value = '';
+        input.focus();
+      }
     }
 
-    function toggleItem(idx) {
-      items[idx].checked = !items[idx].checked;
-      save();
-      render();
+    async function toggleItem(id, currentChecked) {
+      const { error } = await supabase
+        .from('shopping_items')
+        .update({ checked: !currentChecked })
+        .eq('id', id);
+      if (!error) await loadItems();
     }
 
-    function deleteItem(idx) {
-      items.splice(idx, 1);
-      save();
-      render();
+    async function deleteItem(id) {
+      const { error } = await supabase
+        .from('shopping_items')
+        .delete()
+        .eq('id', id);
+      if (!error) await loadItems();
     }
 
-    function clearChecked() {
-      items = items.filter(i => !i.checked);
-      save();
-      render();
+    async function clearChecked() {
+      const { error } = await supabase
+        .from('shopping_items')
+        .delete()
+        .eq('checked', true);
+      if (!error) await loadItems();
     }
 
     document.getElementById('itemInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') addItem();
     });
 
-    render();
+    loadItems();
   </script>
 </body>
 </html>
